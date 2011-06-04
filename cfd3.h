@@ -13,6 +13,9 @@ public:
 	cfd3( QWidget *parent = 0 );
 	~cfd3();
 
+private slots:
+    void fileOpen();
+
 private:
 	Ui::cfd3Class ui;
 	RenderWidget *renderWidget;

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <QtGui/QMouseEvent>
+#include <QtDebug>
 #include "RenderWidget.h"
 
 RenderWidget::RenderWidget( QWidget *parent ) :
@@ -19,20 +20,21 @@ void RenderWidget::initializeGL() {
 
 void RenderWidget::resizeGL( int w, int h ) {
 	glViewport(0, 0, w, h);
-	glMatrixMode( GL_PROJECTION );
+	glMatrixMode( GL_PROJECTION);
 	glLoadIdentity();
-	gluOrtho2D(0, w, 0, h); // set origin to bottom left corner
-	glMatrixMode( GL_MODELVIEW );
+	gluOrtho2D(0, 1, 0, 1);
+	glMatrixMode( GL_MODELVIEW);
 	glLoadIdentity();
 }
 
 void RenderWidget::paintGL() {
 	glClear( GL_COLOR_BUFFER_BIT);
 	glColor3f(1, 0, 0);
-	glBegin( GL_POLYGON);
+	glBegin( GL_QUADS );
 	glVertex2f(0, 0);
-	glVertex2f(100, 500);
-	glVertex2f(500, 100);
+	glVertex2f(1, 0);
+	glVertex2f(1, 1);
+	glVertex2f(0, 1);
 	glEnd();
 }
 
@@ -41,6 +43,10 @@ void RenderWidget::mousePressEvent( QMouseEvent *event ) {
 }
 void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 	//printf("%d, %d\n", event->x(), event->y());
+}
+
+void RenderWidget::loadModel( QString filename ) {
+	qDebug() << "ivjo zoki!";
 }
 
 void RenderWidget::keyPressEvent( QKeyEvent* event ) {

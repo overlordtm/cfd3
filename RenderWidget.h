@@ -3,12 +3,14 @@
 
 #include <QtOpenGL/QGLWidget>
 
+
 class RenderWidget : public QGLWidget {
 
     Q_OBJECT // must include this if you use Qt signals/slots
 
 public:
     RenderWidget(QWidget *parent = NULL);
+    void loadModel(QString filename);
 
 protected:
     void initializeGL();
