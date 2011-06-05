@@ -7,6 +7,7 @@
 #include <QtDebug>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QtGui/QKeyEvent>
 
 cfd3::cfd3( QWidget *parent ) :
 	QMainWindow(parent) {
@@ -24,7 +25,7 @@ cfd3::cfd3( QWidget *parent ) :
 	fileMenu = menuBar()->addMenu("File");
 	fileMenu->addAction(openAction);
 
-	QString message = tr("A context menu is available by right-clicking");
+	QString message = *new QString("To start/stop simulation, press S. To reset, pres R");
 	statusBar()->showMessage(message);
 
 	setMinimumSize(512, 512);
@@ -48,6 +49,23 @@ void cfd3::fileOpen() {
 			msgBox.exec();
 		}
 
+	}
+}
+
+void cfd3::keyPressEvent( QKeyEvent* event ) {
+	switch (event->key()) {
+		case Qt::Key_Escape:
+			close();
+			break;
+		case Qt::Key_S:
+			qDebug() << "Starting simulation";
+			break;
+		case Qt::Key_R:
+			qDebug() << "Reseting simulation";
+			break;
+		default:
+			event->ignore();
+			break;
 	}
 }
 

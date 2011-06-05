@@ -16,6 +16,9 @@ public:
 private slots:
     void fileOpen();
 
+protected:
+	void keyPressEvent( QKeyEvent *event );
+
 private:
 	Ui::cfd3Class ui;
 	RenderWidget *renderWidget;

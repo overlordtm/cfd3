@@ -11,7 +11,7 @@ SOURCES += main.cpp \
     cfd3.cpp
 FORMS += cfd3.ui
 RESOURCES += 
-CUDA_SOURCES += test.cu
+CUDA_SOURCES += kernels.cu
 
 # #######################################################################
 # CUDA
@@ -35,9 +35,9 @@ unix {
     
     # auto-detect CUDA path
     CUDA_DIR = $$system(which nvcc | sed 's,/bin/nvcc$,,')
-    INCLUDEPATH += $$CUDA_DIR/include
-    QMAKE_LIBDIR += $$CUDA_DIR/lib64
-    LIBS += -lcudart
+    INCLUDEPATH += $$CUDA_DIR/include /home/az/NVIDIA_GPU_Computing_SDK/C/common/inc
+    QMAKE_LIBDIR += $$CUDA_DIR/lib64 /home/az/NVIDIA_GPU_Computing_SDK/C/common/obj/x86_64/release
+    LIBS += -lcudart -lGLEW
     cuda.output = ${OBJECTS_DIR}${QMAKE_FILE_BASE}_cuda.obj
     cuda.commands = nvcc \
         -c \

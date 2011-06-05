@@ -6,15 +6,13 @@
 #include <QtGui>
 #include <QApplication>
 
-extern "C" void cudaTest();
-
 int main( int argc, char *argv[] ) {
 
 	QApplication app(argc, argv);
 	cfd3 w;
 	w.show();
 
-	cudaTest();
+	//cudaTest();
 
 	return app.exec();
 }
