@@ -140,7 +140,7 @@ void RenderWidget::paintGL() {
 	 */
 
 
-	//program->bind();
+	program->bind();
 
 	GLint lol = 1.0;
 
@@ -166,7 +166,7 @@ void RenderWidget::paintGL() {
 	glBindTexture(GL_TEXTURE_3D, 0);
 
 
-	//program->release();
+	program->release();
 
 	//glDisable(GL_TEXTURE_2D);
 	//glBindTexture(GL_TEXTURE_2D, 0);
