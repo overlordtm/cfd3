@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'RenderWidget.h'
 **
-** Created: Sun Jun 5 11:13:37 2011
+** Created: Mon Jun 6 23:20:54 2011
 **      by: The Qt Meta Object Compiler version 62 (Qt 4.7.2)
 **
 ** WARNING! All changes made in this file will be lost!
