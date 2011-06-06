@@ -87,7 +87,7 @@ void RenderWidget::resizeGL( int w, int h ) {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	//projection.perspective(45.0, 1.0, 0.0, 2.0);
+	projection.perspective(45.0, 1.0, 0.0, 2.0);
 }
 
 void RenderWidget::paintGL() {
@@ -100,6 +100,13 @@ void RenderWidget::paintGL() {
 	modelView.rotate(-viewRotation.y, 0.0, 1.0, 0.0);
 	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
 	modelView.translate(-0.5, -0.5, 0);
+/*
+	printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
+	printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
+	printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
+	printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
+*/
+	//printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
@@ -147,6 +154,7 @@ void RenderWidget::paintGL() {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
 	program->setUniformValue("modelView", modelView);
+	program->setUniformValue("modelViewInv", modelView.inverted());
 	program->setUniformValue("volumeTex", 0);
 	program->setUniformValue("windowSize", 512.0, 512.0);
 
