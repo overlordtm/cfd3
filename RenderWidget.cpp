@@ -32,6 +32,8 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 void RenderWidget::initializeGL() {
 
 	glEnable(GL_BLEND);
+	glEnable(GL_TEXTURE_3D);
+
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glClearColor(0, 0.125, 0.25, 0); // background color
 
@@ -41,12 +43,12 @@ void RenderWidget::initializeGL() {
 	QGLShader *vshader = new QGLShader(QGLShader::Vertex, this);
 	vshader->compileSourceFile("vertex.glsl");
 
-	QGLShader *fshader = new QGLShader(QGLShader::Fragment, this);
-	fshader->compileSourceFile("frag.glsl");
+	QGLShader *raycastShader = new QGLShader(QGLShader::Fragment, this);
+	raycastShader->compileSourceFile("frag.glsl");
 
 	program = new QGLShaderProgram(this);
-	program->addShader(vshader);
-	//program->addShader(fshader);
+	//program->addShader(vshader);
+	program->addShader(raycastShader);
 	program->link();
 
 	glGenBuffers(1, &cubeVbo);
@@ -71,7 +73,8 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_LUMINANCE, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, h_volume);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, h_volume);
+	glBindTexture(GL_TEXTURE_3D, 0);
 }
 
 void RenderWidget::resizeGL( int w, int h ) {
@@ -90,13 +93,14 @@ void RenderWidget::resizeGL( int w, int h ) {
 void RenderWidget::paintGL() {
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	/*
-	 modelView.setToIdentity();
-	 modelView.translate(-0.5, -0.5, -5);
-	 modelView.rotate(-viewRotation.x, 1.0, 0.0, 0.0);
-	 modelView.rotate(-viewRotation.y, 0.0, 1.0, 0.0);
-	 modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
-	 */
+
+	modelView.setToIdentity();
+	modelView.translate(0, 0, -3);
+	modelView.rotate(-viewRotation.x, 1.0, 0.0, 0.0);
+	modelView.rotate(-viewRotation.y, 0.0, 1.0, 0.0);
+	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
+	modelView.translate(-0.5, -0.5, 0);
+
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	{
@@ -135,23 +139,34 @@ void RenderWidget::paintGL() {
 	 //program->release();
 	 */
 
+
+	//program->bind();
+
+	GLint lol = 1.0;
+
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
-	glEnable(GL_TEXTURE_3D);
+	program->setUniformValue("modelView", modelView);
+	program->setUniformValue("volumeTex", 0);
+	program->setUniformValue("windowSize", 512.0, 512.0);
+
 	glColor3f(1.0, 0.0, 0.0);
 	glBegin(GL_QUADS);
 	{
-		glTexCoord3f(0, 0, 0.5);
+		glTexCoord3f(0, 0, viewTranslation.z);
 		glVertex2f(0, 0);
-		glTexCoord3f(1, 0, 0.5);
+		glTexCoord3f(1, 0, viewTranslation.z);
 		glVertex2f(1, 0);
-		glTexCoord3f(1, 1, 0.5);
+		glTexCoord3f(1, 1, viewTranslation.z);
 		glVertex2f(1, 1);
-		glTexCoord3f(0, 1, 0.5);
+		glTexCoord3f(0, 1, viewTranslation.z);
 		glVertex2f(0, 1);
 	}
 	glEnd();
-	glDisable(GL_TEXTURE_3D);
 	glBindTexture(GL_TEXTURE_3D, 0);
+
+
+	//program->release();
 
 	//glDisable(GL_TEXTURE_2D);
 	//glBindTexture(GL_TEXTURE_2D, 0);
@@ -215,7 +230,7 @@ void RenderWidget::mousePressEvent( QMouseEvent *event ) {
 
 }
 void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
-	qDebug() << "Rotating view! x:" << event->x() << " y:" << event->y();
+	//qDebug() << "Rotating view! x:" << event->x() << " y:" << event->y();
 	int dx, dy;
 
 	dx = event->x() - oldx;
@@ -225,6 +240,17 @@ void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 	viewRotation.y += dx / 3.0;
 	oldx = event->x();
 	oldy = event->y();
+
+	updateGL();
+}
+
+void RenderWidget::wheelEvent ( QWheelEvent * event ) {
+	//qDebug() << "\nKolsecek !" << event->delta();
+
+	viewTranslation.z += (float)(event->delta()/360.0/10);
+
+	if(viewTranslation.z > 1.0) viewTranslation.z = 1.0;
+	if(viewTranslation.z < 0.0) viewTranslation.z = 0.0;
 
 	updateGL();
 }

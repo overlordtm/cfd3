@@ -45,6 +45,7 @@ protected:
 	void paintGL();
 	void mousePressEvent( QMouseEvent *event );
 	void mouseMoveEvent( QMouseEvent *event );
+	void wheelEvent ( QWheelEvent * event );
 
 private:
 	cudaExtent volumeSize;
