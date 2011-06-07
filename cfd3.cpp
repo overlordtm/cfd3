@@ -64,6 +64,7 @@ void cfd3::keyPressEvent( QKeyEvent* event ) {
 			qDebug() << "Reseting simulation";
 			break;
 		default:
+			QApplication::sendEvent(renderWidget, event); // pas event to child
 			event->ignore();
 			break;
 	}

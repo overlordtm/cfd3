@@ -5,20 +5,12 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 
 	renderPbo = 0;
 	renderTex = 0;
-	volumeSize = make_cudaExtent(96, 96, 96);
-	renderSize = make_cudaExtent(96, 96, 0);
+	volumeSize = make_cudaExtent(256, 256, 256);
+	//renderSize = make_cudaExtent(256, 256, 0);
 
-	points = {
-		0.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 0.0, 1.0,
-		1.0, 0.0, 1.0,
-		1.0, 1.0, 1.0,
-		0.0, 1.0, 1.0,
-	};
-	indices = {1, 2, 3, 4, 2, 6, 7, 3, 1, 4, 8, 5, 4, 3, 7, 8, 1, 5, 6, 2, 5, 8, 7, 6,};
+	transferScale = 1.0f;
+	transferOffset = 0.0f;
+	densityScale = 1.0f;
 
 	projection = QMatrix4x4();
 	modelView = QMatrix4x4();
@@ -41,6 +33,7 @@ void RenderWidget::initializeGL() {
 
 	// extensions
 	glewInit();
+	cudaGLSetGLDevice(0);
 
 	QGLShader *vshader = new QGLShader(QGLShader::Vertex, this);
 	vshader->compileSourceFile("vertex.glsl");
@@ -53,20 +46,21 @@ void RenderWidget::initializeGL() {
 	program->addShader(raycastShader);
 	program->link();
 
-	glGenBuffers(1, &cubeVbo);
-	glBindBufferARB(GL_ARRAY_BUFFER, cubeVbo);
-	glBufferDataARB(GL_ARRAY_BUFFER, sizeof(points) * sizeof(GLfloat), points, GL_STATIC_DRAW);
 
-	glGenBuffers(1, &cubeIndicesVbo);
-	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER, cubeIndicesVbo);
-	glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices) * sizeof(GLubyte), indices, GL_STATIC_DRAW);
-	//delete [] points;  // to da error
+	// naloadamo podatke v teksturo
+	char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
+	//char* h_volume = makeCloud(96);
 
+	// pbo za volume
+	glGenBuffers(1, &volumePbo);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, volumePbo);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, volumeSize.width * volumeSize.height * volumeSize.depth, h_volume, GL_STREAM_DRAW);
+	cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, volumePbo, cudaGraphicsMapFlagsWriteDiscard);
 
-	// naloadamo odatke v teksturo
-	//char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
-	char* h_volume = makeCloud(96);
+	checkGlErr("PBO napaka!");
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
+	// naloadamo podatke v tex
 	glGenTextures(1, &volumeTex);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -76,8 +70,11 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, h_volume);
+	//glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_BYTE, 0);
+	//glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
 	glBindTexture(GL_TEXTURE_3D, 0);
+
+	checkGlErr("TEX napaka!");
 
 	// transfer tex
 	glGenTextures(1, &transferTex);
@@ -86,10 +83,14 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, };
+	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.3, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.3, };
 
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
+
+
+	float4* h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
+	initCfd(h_volume, h_velocity, volumeSize);
 }
 
 void RenderWidget::resizeGL( int w, int h ) {
@@ -129,7 +130,10 @@ void RenderWidget::paintGL() {
 	program->bind();
 
 	glActiveTexture(GL_TEXTURE0);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, volumePbo);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
+
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_1D, transferTex);
 	program->setUniformValue("modelView", modelView);
@@ -137,7 +141,10 @@ void RenderWidget::paintGL() {
 	program->setUniformValue("rayOrigin", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z());
 	program->setUniformValue("volumeTex", 0);
 	program->setUniformValue("transferTex", 1);
-	program->setUniformValue("windowSize", (float)size().width(), (float)size().height());
+	program->setUniformValue("windowSize", (float) size().width(), (float) size().height());
+	program->setUniformValue("densityScale", densityScale);
+	program->setUniformValue("transferScale", transferScale);
+	program->setUniformValue("transferOffset", transferOffset);
 
 	//glColor3f(1.0, 0.0, 0.0);
 	glBegin(GL_QUADS);
@@ -158,8 +165,9 @@ void RenderWidget::paintGL() {
 
 	program->release();
 
-}
+	checkGlErr("render napaka!");
 
+}
 
 void RenderWidget::mousePressEvent( QMouseEvent *event ) {
 
@@ -171,7 +179,7 @@ void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 	dx = event->x() - oldx;
 	dy = event->y() - oldy;
 
-	qDebug() << "Rotating view! x:" << dx << " y:" << dy;
+	//qDebug() << "Rotating view! x:" << dx << " y:" << dy;
 
 	if (abs(dx) > 10 || abs(dy) > 10) {
 		oldx = event->x();
@@ -191,6 +199,33 @@ void RenderWidget::wheelEvent( QWheelEvent * event ) {
 	qDebug() << "\nKolsecek !" << event->delta();
 
 	viewTranslation.z += (float) (event->delta() / 360.0);
+
+	updateGL();
+}
+
+void RenderWidget::keyPressEvent( QKeyEvent* event ) {
+	switch (event->key()) {
+		case Qt::Key_Plus:
+			densityScale += 0.05;
+			break;
+		case Qt::Key_Minus:
+			densityScale -= 0.05;
+			break;
+
+		case Qt::Key_Up:
+			transferScale += 0.05;
+			break;
+		case Qt::Key_Down:
+			transferScale -= 0.05;
+			break;
+
+		case Qt::Key_PageUp:
+			transferOffset += 0.01;
+			break;
+		case Qt::Key_PageDown:
+			transferOffset -= 0.01;
+			break;
+	}
 
 	updateGL();
 }
@@ -237,14 +272,21 @@ char* makeCloud( int size ) {
 				float dy = center - y;
 				float dz = center - z;
 
-				float off = fabsf(perlin.GetValue(x*frequency, y*frequency, z*frequency));
+				float off = fabsf(perlin.GetValue(x * frequency, y * frequency, z * frequency));
 
 				float d = sqrtf(dx * dx + dy * dy + dz * dz) / size;
 
-				cloud[x*(size*size) + y*size + z] = ((d - off) < 0.125f) ? 128 : 0;
+				cloud[x * (size * size) + y * size + z] = ((d - off) < 0.125f) ? 255 : 0;
 			}
 		}
 	}
 
 	return cloud;
+}
+
+void checkGlErr( const char* msg ) {
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		fprintf(stderr, "GL error: %s (%s)", msg, gluErrorString(err));
+	}
 }

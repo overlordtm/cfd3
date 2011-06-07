@@ -23,9 +23,8 @@ typedef unsigned char VolumeData;
 
 void* loadRawFile( const char *filename, size_t size );
 char* makeCloud(int size);
-extern "C" void initRaycast( void* volume, cudaExtent volumeSize );
-extern "C" void copyInvViewMatrix( float *invViewMatrix, size_t sizeofMatrix );
-extern "C" void render_kernel( dim3 gridSize, dim3 blockSize, uint *d_output, uint imageW, uint imageH, float density, float brightness, float transferOffset, float transferScale );
+void checkGlErr(const char* msg);
+extern "C" void initCfd( void* h_volume, void* h_velocity, cudaExtent volumeSize);
 
 class RenderWidget: public QGLWidget {
 
@@ -43,6 +42,7 @@ protected:
 	void mousePressEvent( QMouseEvent *event );
 	void mouseMoveEvent( QMouseEvent *event );
 	void wheelEvent ( QWheelEvent * event );
+	void keyPressEvent( QKeyEvent* event );
 
 private:
 	cudaExtent volumeSize;
@@ -54,6 +54,7 @@ private:
 	GLuint renderPbo;
 	GLuint renderTex;
 	GLuint volumeTex;
+	GLuint volumePbo;
 	GLuint transferTex;
 	GLuint cubeVbo;
 	GLuint cubeIndicesVbo;
@@ -65,7 +66,9 @@ private:
 
 	float3 viewRotation;
 	float3 viewTranslation;
-	float invViewMatrix[12];
+	float transferScale;
+	float transferOffset;
+	float densityScale;
 	int oldx, oldy; // mouse tracking
 
 	dim3 blockSize;
