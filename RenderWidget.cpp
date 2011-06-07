@@ -69,9 +69,9 @@ void RenderWidget::initializeGL() {
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, h_volume);
@@ -100,12 +100,13 @@ void RenderWidget::resizeGL( int w, int h ) {
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluOrtho2D(0, 1.0, 0.0, 10.0);
+	gluOrtho2D(0, 1.0, 0.0, 1.0);
 	//gluPerspective(30.0, 1.0, 0.0, 2.0);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	projection.perspective(45.0, 1.0, 0.0, 2.0);
+	projection.ortho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+	//projection.perspective(45.0, 1.0, 0.0, 2.0);
 }
 
 void RenderWidget::paintGL() {
@@ -113,65 +114,22 @@ void RenderWidget::paintGL() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	modelView.setToIdentity();
-	modelView.translate(0, 0, -2);
+
 	modelView.rotate(-viewRotation.x, 1.0, 0.0, 0.0);
 	modelView.rotate(-viewRotation.y, 0.0, 1.0, 0.0);
 	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
-	//modelView.translate(-0.5, -0.5, 0);
+	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
-	/*
+/*
 	 printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
 	 printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
 	 printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
 	 printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
-	 */
-	printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
-/*
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	{
-
-		glLoadIdentity();
-		glTranslatef(0, 0, -3);
-		glRotatef(-viewRotation.x, 1.0, 0.0, 0.0);
-		glRotatef(-viewRotation.y, 0.0, 1.0, 0.0);
-		glRotatef(-viewRotation.z, 0.0, 0.0, 1.0);
-		glTranslatef(-0.5, -0.5, 0);
-		// center it
-		//glTranslatef( viewTranslation.x, viewTranslation.y, viewTranslation.z );
-	}
 */
-	/*
-	 glBindBuffer(GL_ARRAY_BUFFER, cubeVbo);
-	 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIndicesVbo);
+	//printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
 
-
-	 //program->bind();
-	 //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	 //glEnableVertexAttribArray(0);
-
-	 //program->setUniformValue("proj", projection);
-	 //program->setUniformValue("modelView", modelView);
-
-	 glEnableClientState(GL_VERTEX_ARRAY);
-
-	 glVertexPointer(3, GL_FLOAT, 0, 0);
-	 glDrawElements(GL_QUADS, 24, GL_UNSIGNED_BYTE, 0);
-
-	 glDisableClientState(GL_VERTEX_ARRAY);
-	 glBindBuffer(GL_ARRAY_BUFFER, 0);
-	 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	 //program->release();
-	 */
-
-	glPushMatrix();
-	glLoadIdentity();
-	//glTranslatef(-0.5, -0.5, 0);
 
 	program->bind();
-
-	GLint lol = 1.0;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
@@ -179,6 +137,7 @@ void RenderWidget::paintGL() {
 	glBindTexture(GL_TEXTURE_1D, transferTex);
 	program->setUniformValue("modelView", modelView);
 	program->setUniformValue("modelViewInv", modelView.inverted());
+	program->setUniformValue("rayOrigin",  modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z());
 	program->setUniformValue("volumeTex", 0);
 	program->setUniformValue("transferTex", 1);
 	program->setUniformValue("windowSize", 512.0, 512.0);
@@ -203,11 +162,6 @@ void RenderWidget::paintGL() {
 
 	program->release();
 
-	//glDisable(GL_TEXTURE_2D);
-	//glBindTexture(GL_TEXTURE_2D, 0);
-	//program->release();
-
-	glPopMatrix();
 }
 
 void RenderWidget::render() {
@@ -265,29 +219,33 @@ void RenderWidget::mousePressEvent( QMouseEvent *event ) {
 
 }
 void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
-	//qDebug() << "Rotating view! x:" << event->x() << " y:" << event->y();
+
 	int dx, dy;
 
 	dx = event->x() - oldx;
 	dy = event->y() - oldy;
 
-	viewRotation.x += dy / 3.0;
-	viewRotation.y += dx / 3.0;
-	oldx = event->x();
-	oldy = event->y();
 
-	updateGL();
+	qDebug() << "Rotating view! x:" << dx << " y:" << dy;
+
+	if(abs(dx) > 10 || abs(dy) > 10) {
+		oldx = event->x();
+		oldy = event->y();
+	} else {
+
+		viewRotation.x += dy;
+		viewRotation.y += dx;
+		oldx = event->x();
+		oldy = event->y();
+
+		updateGL();
+	}
 }
 
 void RenderWidget::wheelEvent( QWheelEvent * event ) {
 	qDebug() << "\nKolsecek !" << event->delta();
 
-	viewTranslation.z += (float) (event->delta() / 360.0 / 10);
-
-	if (viewTranslation.z > 1.0)
-		viewTranslation.z = 1.0;
-	if (viewTranslation.z < 0.0)
-		viewTranslation.z = 0.0;
+	viewTranslation.z += (float) (event->delta() / 360.0);
 
 	updateGL();
 }
