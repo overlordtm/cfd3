@@ -16,9 +16,8 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 	modelView = QMatrix4x4();
 	program = 0;
 
-	blockSize = dim3(16, 16);
-	gridSize = dim3((int) ceil(renderSize.width / blockSize.x), (int) ceil(renderSize.height / blockSize.y));
-
+	blockSize = dim3(8, 8, 8);
+	gridSize = dim3((int) ceil(volumeSize.depth / blockSize.x) * (int) ceil(volumeSize.depth / blockSize.z), (int) ceil(volumeSize.height / blockSize.y));
 }
 
 void RenderWidget::initializeGL() {
@@ -83,7 +82,7 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.3, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.3, };
+	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, };
 
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
@@ -118,17 +117,22 @@ void RenderWidget::paintGL() {
 	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
 	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
-	/*
-	 printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
-	 printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
-	 printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
-	 printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
-	 */
-	//printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
-
 
 	program->bind();
 
+	uint *d_output;
+	//cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
+	size_t num_bytes;
+	// save pointer to cuda_pbo_resource into d_output
+	//cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
+	//cudaMemset(d_output, 0, volumeSize.width * volumeSize.height * volumeSize.depth);
+
+	//writeToPbo(gridSize, blockSize, &cuda_pbo_resource, volumeSize);
+	checkCudaErr("wirte to pbo failed!");
+
+	//cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+
+	// read volume from PBO to 3D tex
 	glActiveTexture(GL_TEXTURE0);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, volumePbo);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
@@ -146,22 +150,19 @@ void RenderWidget::paintGL() {
 	program->setUniformValue("transferScale", transferScale);
 	program->setUniformValue("transferOffset", transferOffset);
 
-	//glColor3f(1.0, 0.0, 0.0);
+
 	glBegin(GL_QUADS);
 	{
-		//glTexCoord3f(0, 0, viewTranslation.z);
 		glVertex2f(0, 0);
-		//glTexCoord3f(1, 0, viewTranslation.z);
 		glVertex2f(1, 0);
-		//glTexCoord3f(1, 1, viewTranslation.z);
 		glVertex2f(1, 1);
-		//glTexCoord3f(0, 1, viewTranslation.z);
 		glVertex2f(0, 1);
 	}
 	glEnd();
 
 	glBindTexture(GL_TEXTURE_1D, 0);
 	glBindTexture(GL_TEXTURE_3D, 0);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 	program->release();
 
@@ -181,7 +182,7 @@ void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 
 	//qDebug() << "Rotating view! x:" << dx << " y:" << dy;
 
-	if (abs(dx) > 10 || abs(dy) > 10) {
+	if (abs(dx) > 15 || abs(dy) > 15) {
 		oldx = event->x();
 		oldy = event->y();
 	} else {
@@ -212,10 +213,10 @@ void RenderWidget::keyPressEvent( QKeyEvent* event ) {
 			densityScale -= 0.05;
 			break;
 
-		case Qt::Key_Up:
+		case Qt::Key_Home:
 			transferScale += 0.05;
 			break;
-		case Qt::Key_Down:
+		case Qt::Key_End:
 			transferScale -= 0.05;
 			break;
 
@@ -224,6 +225,20 @@ void RenderWidget::keyPressEvent( QKeyEvent* event ) {
 			break;
 		case Qt::Key_PageDown:
 			transferOffset -= 0.01;
+			break;
+
+		case Qt::Key_Up:
+			viewTranslation.y -= 0.05;
+			break;
+		case Qt::Key_Down:
+			viewTranslation.y += 0.05;
+			break;
+
+		case Qt::Key_Left:
+			viewTranslation.x += 0.05;
+			break;
+		case Qt::Key_Right:
+			viewTranslation.x -= 0.05;
 			break;
 	}
 
