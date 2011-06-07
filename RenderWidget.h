@@ -57,6 +57,7 @@ private:
 	GLuint renderPbo;
 	GLuint renderTex;
 	GLuint volumeTex;
+	GLuint transferTex;
 	GLuint cubeVbo;
 	GLuint cubeIndicesVbo;
 

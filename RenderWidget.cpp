@@ -32,6 +32,7 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 void RenderWidget::initializeGL() {
 
 	glEnable(GL_BLEND);
+	glEnable(GL_TEXTURE_1D);
 	glEnable(GL_TEXTURE_3D);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -75,6 +76,23 @@ void RenderWidget::initializeGL() {
 
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RED, volumeSize.width, volumeSize.height, volumeSize.depth, 0, GL_RED, GL_UNSIGNED_BYTE, h_volume);
 	glBindTexture(GL_TEXTURE_3D, 0);
+
+	// transfer tex
+	glGenTextures(1, &transferTex);
+	glBindTexture(GL_TEXTURE_1D, transferTex);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+	float4 transferFunc[] = {
+			0.0, 0.0, 0.0, 0.0,
+			1.0, 0.0, 0.0, 1.0,
+			0.0, 1.0, 0.0, 1.0,
+			0.0, 0.0, 1.0, 1.0
+			};
+
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 4, 0, GL_RGBA, GL_FLOAT, transferFunc);
+	glBindTexture(GL_TEXTURE_1D, 0);
 }
 
 void RenderWidget::resizeGL( int w, int h ) {
@@ -82,8 +100,8 @@ void RenderWidget::resizeGL( int w, int h ) {
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	//gluOrtho2D(-0.2, 1.2, -0.2, 1.2);
-	gluPerspective(30.0, 1.0, 0.0, 2.0);
+	gluOrtho2D(0, 1.0, 0.0, 10.0);
+	//gluPerspective(30.0, 1.0, 0.0, 2.0);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
@@ -95,19 +113,20 @@ void RenderWidget::paintGL() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	modelView.setToIdentity();
-	modelView.translate(0, 0, -3);
+	modelView.translate(0, 0, -2);
 	modelView.rotate(-viewRotation.x, 1.0, 0.0, 0.0);
 	modelView.rotate(-viewRotation.y, 0.0, 1.0, 0.0);
 	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
-	modelView.translate(-0.5, -0.5, 0);
+	//modelView.translate(-0.5, -0.5, 0);
+	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
+	/*
+	 printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
+	 printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
+	 printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
+	 printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
+	 */
+	printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
 /*
-	printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
-	printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
-	printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
-	printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
-*/
-	//printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
-
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	{
@@ -121,7 +140,7 @@ void RenderWidget::paintGL() {
 		// center it
 		//glTranslatef( viewTranslation.x, viewTranslation.y, viewTranslation.z );
 	}
-
+*/
 	/*
 	 glBindBuffer(GL_ARRAY_BUFFER, cubeVbo);
 	 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIndicesVbo);
@@ -146,6 +165,9 @@ void RenderWidget::paintGL() {
 	 //program->release();
 	 */
 
+	glPushMatrix();
+	glLoadIdentity();
+	//glTranslatef(-0.5, -0.5, 0);
 
 	program->bind();
 
@@ -153,26 +175,31 @@ void RenderWidget::paintGL() {
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_1D, transferTex);
 	program->setUniformValue("modelView", modelView);
 	program->setUniformValue("modelViewInv", modelView.inverted());
 	program->setUniformValue("volumeTex", 0);
+	program->setUniformValue("transferTex", 1);
 	program->setUniformValue("windowSize", 512.0, 512.0);
+	//program->setUniformValue("focalLenght", 2.0);
 
-	glColor3f(1.0, 0.0, 0.0);
+	//glColor3f(1.0, 0.0, 0.0);
 	glBegin(GL_QUADS);
 	{
-		glTexCoord3f(0, 0, viewTranslation.z);
+		//glTexCoord3f(0, 0, viewTranslation.z);
 		glVertex2f(0, 0);
-		glTexCoord3f(1, 0, viewTranslation.z);
+		//glTexCoord3f(1, 0, viewTranslation.z);
 		glVertex2f(1, 0);
-		glTexCoord3f(1, 1, viewTranslation.z);
+		//glTexCoord3f(1, 1, viewTranslation.z);
 		glVertex2f(1, 1);
-		glTexCoord3f(0, 1, viewTranslation.z);
+		//glTexCoord3f(0, 1, viewTranslation.z);
 		glVertex2f(0, 1);
 	}
 	glEnd();
-	glBindTexture(GL_TEXTURE_3D, 0);
 
+	glBindTexture(GL_TEXTURE_1D, 0);
+	glBindTexture(GL_TEXTURE_3D, 0);
 
 	program->release();
 
@@ -252,13 +279,15 @@ void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 	updateGL();
 }
 
-void RenderWidget::wheelEvent ( QWheelEvent * event ) {
-	//qDebug() << "\nKolsecek !" << event->delta();
+void RenderWidget::wheelEvent( QWheelEvent * event ) {
+	qDebug() << "\nKolsecek !" << event->delta();
 
-	viewTranslation.z += (float)(event->delta()/360.0/10);
+	viewTranslation.z += (float) (event->delta() / 360.0 / 10);
 
-	if(viewTranslation.z > 1.0) viewTranslation.z = 1.0;
-	if(viewTranslation.z < 0.0) viewTranslation.z = 0.0;
+	if (viewTranslation.z > 1.0)
+		viewTranslation.z = 1.0;
+	if (viewTranslation.z < 0.0)
+		viewTranslation.z = 0.0;
 
 	updateGL();
 }
