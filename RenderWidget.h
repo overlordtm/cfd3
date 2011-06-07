@@ -26,7 +26,7 @@ char* makeCloud(int size);
 void checkGlErr(const char* msg);
 extern "C" void initCfd( void* h_volume, void* h_velocity, cudaExtent volumeSize);
 extern "C" void checkCudaErr(const char* msg);
-extern "C" void writeToPbo(dim3 gridSize, dim3 blockSize, uint* pbo, cudaExtent volumeSize);
+extern "C" void writeToPbo(dim3 gridSize, dim3 blockSize, uint* pbo, cudaExtent volumeSize, int magic);
 
 class RenderWidget: public QGLWidget {
 

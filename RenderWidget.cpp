@@ -5,7 +5,8 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 
 	renderPbo = 0;
 	renderTex = 0;
-	volumeSize = make_cudaExtent(256, 256, 256);
+	//volumeSize = make_cudaExtent(256, 256, 256);
+	volumeSize = make_cudaExtent(96, 96, 96);
 	//renderSize = make_cudaExtent(256, 256, 0);
 
 	transferScale = 1.0f;
@@ -17,7 +18,10 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 	program = 0;
 
 	blockSize = dim3(8, 8, 8);
-	gridSize = dim3((int) ceil(volumeSize.depth / blockSize.x) * (int) ceil(volumeSize.depth / blockSize.z), (int) ceil(volumeSize.height / blockSize.y));
+	gridSize = dim3((int) ceil(volumeSize.width / blockSize.x) * (int) ceil(volumeSize.depth / blockSize.z), (int) ceil(volumeSize.height / blockSize.y));
+
+	fprintf(stderr, "\nblockSize(%d, %d, %d)\n", blockSize.x, blockSize.y, blockSize.z);
+	fprintf(stderr, "gridSize(%d, %d, %d)\n", gridSize.x, gridSize.y, gridSize.z);
 }
 
 void RenderWidget::initializeGL() {
@@ -47,14 +51,14 @@ void RenderWidget::initializeGL() {
 
 
 	// naloadamo podatke v teksturo
-	char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
-	//char* h_volume = makeCloud(96);
+	//char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
+	char* h_volume = makeCloud(96);
 
 	// pbo za volume
 	glGenBuffers(1, &volumePbo);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, volumePbo);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, volumeSize.width * volumeSize.height * volumeSize.depth, h_volume, GL_STREAM_DRAW);
-	cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, volumePbo, cudaGraphicsMapFlagsWriteDiscard);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, volumeSize.width * volumeSize.height * volumeSize.depth, h_volume, GL_DYNAMIC_DRAW);
+	cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, volumePbo, cudaGraphicsMapFlagsNone);
 
 	checkGlErr("PBO napaka!");
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -90,6 +94,26 @@ void RenderWidget::initializeGL() {
 
 	float4* h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
 	initCfd(h_volume, h_velocity, volumeSize);
+
+
+	uint *d_output;
+	cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
+	size_t num_bytes;
+	// save pointer to cuda_pbo_resource into d_output
+	cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
+
+	fprintf(stderr, "CUDA resource pointer mapped, has access to %u bytes", num_bytes);
+	//cudaMemset(d_output, 64, volumeSize.width * volumeSize.height * volumeSize.depth);
+
+	int magic = volumeSize.depth / blockSize.z;
+
+	//fprintf(stderr, "magic je %d", magic);
+
+	writeToPbo(gridSize, blockSize, d_output, volumeSize, magic);
+	checkCudaErr("wirte to pbo failed!");
+
+	cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+
 }
 
 void RenderWidget::resizeGL( int w, int h ) {
@@ -118,20 +142,8 @@ void RenderWidget::paintGL() {
 	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
 
+
 	program->bind();
-
-	uint *d_output;
-	//cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
-	size_t num_bytes;
-	// save pointer to cuda_pbo_resource into d_output
-	//cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
-	//cudaMemset(d_output, 0, volumeSize.width * volumeSize.height * volumeSize.depth);
-
-	//writeToPbo(gridSize, blockSize, &cuda_pbo_resource, volumeSize);
-	checkCudaErr("wirte to pbo failed!");
-
-	//cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
-
 	// read volume from PBO to 3D tex
 	glActiveTexture(GL_TEXTURE0);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, volumePbo);
@@ -266,7 +278,7 @@ void* loadRawFile( const char *filename, size_t size ) {
 	size_t read = fread(data, 1, size, fp);
 	fclose(fp);
 
-	printf("Read '%s', %zu bytes\n", filename, read);
+	printf("Read '%s', %u bytes\n", filename, read);
 
 	return data;
 }
@@ -302,6 +314,6 @@ char* makeCloud( int size ) {
 void checkGlErr( const char* msg ) {
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR) {
-		fprintf(stderr, "GL error: %s (%s)", msg, gluErrorString(err));
+		fprintf(stderr, "\nGL error: %s (%s)\n", msg, gluErrorString(err));
 	}
 }
