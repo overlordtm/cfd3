@@ -4,16 +4,15 @@ QT += core \
     gui \
     svg \
     opengl
-HEADERS += perlin.h \
-    RenderWidget.h \
+HEADERS += RenderWidget.h \
     cfd3.h
-SOURCES += perlin.c \
-    main.cpp \
+SOURCES += main.cpp \
     RenderWidget.cpp \
     cfd3.cpp
 FORMS += cfd3.ui
 RESOURCES += 
 CUDA_SOURCES += kernels.cu
+LIBS += -lnoise
 
 # #######################################################################
 # CUDA

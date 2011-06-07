@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <iostream>
+#include <libnoise/noise.h>
 
 #include <GL/glew.h>
 
@@ -15,20 +17,15 @@
 #include <cutil_inline.h>
 #include <cuda_gl_interop.h>
 
+//using namespace noise;
 
 typedef unsigned char VolumeData;
 
 void* loadRawFile( const char *filename, size_t size );
+char* makeCloud(int size);
 extern "C" void initRaycast( void* volume, cudaExtent volumeSize );
 extern "C" void copyInvViewMatrix( float *invViewMatrix, size_t sizeofMatrix );
 extern "C" void render_kernel( dim3 gridSize, dim3 blockSize, uint *d_output, uint imageW, uint imageH, float density, float brightness, float transferOffset, float transferScale );
-
-static  GLfloat coords[] = {
-		0.0, 0.0, 0.0,
-		1.0, 0.0, 0.0,
-		1.0, 1.0, 0.0,
-		0.0, 1.0, 0.0,
-};
 
 class RenderWidget: public QGLWidget {
 

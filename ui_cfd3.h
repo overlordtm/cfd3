@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'cfd3.ui'
 **
-** Created: Sun Jun 5 00:00:38 2011
+** Created: Tue Jun 7 12:52:59 2011
 **      by: Qt User Interface Compiler version 4.7.2
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!

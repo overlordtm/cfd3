@@ -5,8 +5,8 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 
 	renderPbo = 0;
 	renderTex = 0;
-	volumeSize = make_cudaExtent(256, 256, 256);
-	renderSize = make_cudaExtent(256, 256, 0);
+	volumeSize = make_cudaExtent(96, 96, 96);
+	renderSize = make_cudaExtent(96, 96, 0);
 
 	points = {
 		0.0, 0.0, 0.0,
@@ -36,7 +36,8 @@ void RenderWidget::initializeGL() {
 	glEnable(GL_TEXTURE_3D);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glClearColor(0, 0.125, 0.25, 0); // background color
+	//glClearColor(0, 0.125, 0.25, 0); // background color
+	glClearColor(0, 0, 0, 0);
 
 	// extensions
 	glewInit();
@@ -63,7 +64,8 @@ void RenderWidget::initializeGL() {
 
 
 	// naloadamo odatke v teksturo
-	char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
+	//char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
+	char* h_volume = makeCloud(96);
 
 	glGenTextures(1, &volumeTex);
 	glBindTexture(GL_TEXTURE_3D, volumeTex);
@@ -84,14 +86,9 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-	float4 transferFunc[] = {
-			0.0, 0.0, 0.0, 0.0,
-			1.0, 0.0, 0.0, 1.0,
-			0.0, 1.0, 0.0, 1.0,
-			0.0, 0.0, 1.0, 1.0
-			};
+	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, };
 
-	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 4, 0, GL_RGBA, GL_FLOAT, transferFunc);
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
 }
 
@@ -120,12 +117,12 @@ void RenderWidget::paintGL() {
 	modelView.rotate(-viewRotation.z, 0.0, 0.0, 1.0);
 	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
-/*
+	/*
 	 printf("%f %f %f %f \n", modelView.constData()[0], modelView.constData()[1], modelView.constData()[2], modelView.constData()[3]);
 	 printf("%f %f %f %f \n", modelView.constData()[4], modelView.constData()[5], modelView.constData()[6], modelView.constData()[7]);
 	 printf("%f %f %f %f \n", modelView.constData()[8], modelView.constData()[9], modelView.constData()[10], modelView.constData()[11]);
 	 printf("%f %f %f %f \n\n", modelView.constData()[12], modelView.constData()[13], modelView.constData()[14], modelView.constData()[15]);
-*/
+	 */
 	//printf("%f %f %f %f \n", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z(), modelView.column(3).w());
 
 
@@ -137,11 +134,10 @@ void RenderWidget::paintGL() {
 	glBindTexture(GL_TEXTURE_1D, transferTex);
 	program->setUniformValue("modelView", modelView);
 	program->setUniformValue("modelViewInv", modelView.inverted());
-	program->setUniformValue("rayOrigin",  modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z());
+	program->setUniformValue("rayOrigin", modelView.column(3).x(), modelView.column(3).y(), modelView.column(3).z());
 	program->setUniformValue("volumeTex", 0);
 	program->setUniformValue("transferTex", 1);
-	program->setUniformValue("windowSize", 512.0, 512.0);
-	//program->setUniformValue("focalLenght", 2.0);
+	program->setUniformValue("windowSize", (float)size().width(), (float)size().height());
 
 	//glColor3f(1.0, 0.0, 0.0);
 	glBegin(GL_QUADS);
@@ -164,56 +160,6 @@ void RenderWidget::paintGL() {
 
 }
 
-void RenderWidget::render() {
-
-	copyInvViewMatrix(invViewMatrix, sizeof(float4) * 3);
-	uint *d_output;
-
-	// map PBO to get CUDA device pointer
-	cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
-
-	size_t num_bytes;
-	// save pointer to cuda_pbo_resource into d_output
-	cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
-
-	// clear image
-	cudaMemset(d_output, 0, renderSize.width * renderSize.height * 4);
-
-	// call CUDA kernel, writing results to PBO
-	render_kernel(gridSize, blockSize, d_output, renderSize.width, renderSize.height, 0.15, 1.0, 1.0, 1.0);
-	cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
-
-}
-
-void RenderWidget::initPixelBuffer() {
-
-	if (renderPbo) {
-		printf("Unregistring buffer");
-		// unregister this buffer object from CUDA C
-		cudaGraphicsUnregisterResource(cuda_pbo_resource);
-		// delete old buffer
-		glDeleteBuffers(1, &renderPbo);
-		glDeleteTextures(1, &renderTex);
-	}
-
-	// create pixel buffer object for display
-	glGenBuffers(1, &renderPbo);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, renderPbo);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, renderSize.width * renderSize.height * sizeof(GLubyte) * 4, 0, GL_STREAM_DRAW);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-
-	// register this buffer object with CUDA, so we can access it
-	cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, renderPbo, cudaGraphicsMapFlagsWriteDiscard);
-
-	// create texture for display
-	glGenTextures(1, &renderTex);
-	glBindTexture(GL_TEXTURE_2D, renderTex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, renderSize.width, renderSize.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-}
 
 void RenderWidget::mousePressEvent( QMouseEvent *event ) {
 
@@ -225,10 +171,9 @@ void RenderWidget::mouseMoveEvent( QMouseEvent *event ) {
 	dx = event->x() - oldx;
 	dy = event->y() - oldy;
 
-
 	qDebug() << "Rotating view! x:" << dx << " y:" << dy;
 
-	if(abs(dx) > 10 || abs(dy) > 10) {
+	if (abs(dx) > 10 || abs(dy) > 10) {
 		oldx = event->x();
 		oldy = event->y();
 	} else {
@@ -274,4 +219,32 @@ void* loadRawFile( const char *filename, size_t size ) {
 	printf("Read '%s', %zu bytes\n", filename, read);
 
 	return data;
+}
+
+char* makeCloud( int size ) {
+
+	noise::module::Perlin perlin;
+
+	char* cloud = (char*) malloc(size * size * size * sizeof(char));
+
+	float frequency = 10.0f / size;
+	float center = size / 2.0f + 0.5f;
+
+	for (int x = 0; x < size; x++) {
+		for (int y = 0; y < size; y++) {
+			for (int z = 0; z < size; z++) {
+				float dx = center - x;
+				float dy = center - y;
+				float dz = center - z;
+
+				float off = fabsf(perlin.GetValue(x*frequency, y*frequency, z*frequency));
+
+				float d = sqrtf(dx * dx + dy * dy + dz * dz) / size;
+
+				cloud[x*(size*size) + y*size + z] = ((d - off) < 0.125f) ? 128 : 0;
+			}
+		}
+	}
+
+	return cloud;
 }
