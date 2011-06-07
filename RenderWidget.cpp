@@ -124,7 +124,8 @@ void RenderWidget::paintGL() {
 	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
 
-	if (simulate) {
+	if (doSim) {
+		fprintf(stderr, "Delam korak simulacije");
 		char* d_output;
 		cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
 		size_t num_bytes;
