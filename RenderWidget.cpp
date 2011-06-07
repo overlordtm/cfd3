@@ -3,6 +3,8 @@
 RenderWidget::RenderWidget( QWidget *parent ) :
 	QGLWidget(parent) {
 
+	doSim = false;
+
 	renderPbo = 0;
 	renderTex = 0;
 	//volumeSize = make_cudaExtent(256, 256, 256);
@@ -49,7 +51,6 @@ void RenderWidget::initializeGL() {
 	program->addShader(raycastShader);
 	program->link();
 
-
 	// naloadamo podatke v teksturo
 	//char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
 	char* h_volume = makeCloud(96);
@@ -91,28 +92,9 @@ void RenderWidget::initializeGL() {
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
 
-
 	float4* h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
+
 	initCfd(h_volume, h_velocity, volumeSize);
-
-
-	uint *d_output;
-	cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
-	size_t num_bytes;
-	// save pointer to cuda_pbo_resource into d_output
-	cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
-
-	fprintf(stderr, "CUDA resource pointer mapped, has access to %u bytes", num_bytes);
-	//cudaMemset(d_output, 64, volumeSize.width * volumeSize.height * volumeSize.depth);
-
-	int magic = volumeSize.depth / blockSize.z;
-
-	//fprintf(stderr, "magic je %d", magic);
-
-	writeToPbo(gridSize, blockSize, d_output, volumeSize, magic);
-	checkCudaErr("wirte to pbo failed!");
-
-	cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
 
 }
 
@@ -142,6 +124,22 @@ void RenderWidget::paintGL() {
 	modelView.translate(0.0, 0.0, 2.0);
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
 
+	if (simulate) {
+		char* d_output;
+		cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
+		size_t num_bytes;
+		// save pointer to cuda_pbo_resource into d_output
+		cudaGraphicsResourceGetMappedPointer((void **) &d_output, &num_bytes, cuda_pbo_resource);
+
+		//fprintf(stderr, "CUDA resource pointer mapped, has access to %u bytes", num_bytes);
+		//cudaMemset(d_output, 64, volumeSize.width * volumeSize.height * volumeSize.depth);
+
+		int magic = volumeSize.depth / blockSize.z;
+		simulate(gridSize, blockSize, d_output, volumeSize, magic);
+		checkCudaErr("Simulation failed!");
+
+		cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+	}
 
 	program->bind();
 	// read volume from PBO to 3D tex
@@ -161,7 +159,6 @@ void RenderWidget::paintGL() {
 	program->setUniformValue("densityScale", densityScale);
 	program->setUniformValue("transferScale", transferScale);
 	program->setUniformValue("transferOffset", transferOffset);
-
 
 	glBegin(GL_QUADS);
 	{
@@ -251,6 +248,18 @@ void RenderWidget::keyPressEvent( QKeyEvent* event ) {
 			break;
 		case Qt::Key_Right:
 			viewTranslation.x -= 0.05;
+			break;
+
+		case Qt::Key_S:
+			if(doSim) {
+				qDebug() << "Stopping simulation";
+			} else {
+				qDebug() << "Starting simulation";
+			}
+			doSim = !doSim;
+			break;
+		case Qt::Key_R:
+			qDebug() << "Reseting simulation";
 			break;
 	}
 

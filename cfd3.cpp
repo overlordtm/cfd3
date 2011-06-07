@@ -57,12 +57,6 @@ void cfd3::keyPressEvent( QKeyEvent* event ) {
 		case Qt::Key_Escape:
 			close();
 			break;
-		case Qt::Key_S:
-			qDebug() << "Starting simulation";
-			break;
-		case Qt::Key_R:
-			qDebug() << "Reseting simulation";
-			break;
 		default:
 			QApplication::sendEvent(renderWidget, event); // pas event to child
 			event->ignore();
