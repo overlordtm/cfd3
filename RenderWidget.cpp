@@ -24,6 +24,7 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 
 	fprintf(stderr, "\nblockSize(%d, %d, %d)\n", blockSize.x, blockSize.y, blockSize.z);
 	fprintf(stderr, "gridSize(%d, %d, %d)\n", gridSize.x, gridSize.y, gridSize.z);
+
 }
 
 void RenderWidget::initializeGL() {
@@ -33,8 +34,8 @@ void RenderWidget::initializeGL() {
 	glEnable(GL_TEXTURE_3D);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glClearColor(0, 0.125, 0.25, 0); // background color
-	glClearColor(0, 0, 0, 0);
+	glClearColor(0, 0.125, 0.25, 0); // background color
+	//glClearColor(0, 0, 0, 0);
 
 	// extensions
 	glewInit();
@@ -178,6 +179,7 @@ void RenderWidget::paintGL() {
 
 	checkGlErr("render napaka!");
 
+	update();
 }
 
 void RenderWidget::mousePressEvent( QMouseEvent *event ) {
