@@ -7,6 +7,7 @@ RenderWidget::RenderWidget( QWidget *parent ) :
 
 	renderPbo = 0;
 	renderTex = 0;
+	//volumeSize = make_cudaExtent(256, 256, 178);
 	//volumeSize = make_cudaExtent(256, 256, 256);
 	volumeSize = make_cudaExtent(96, 96, 96);
 	//renderSize = make_cudaExtent(256, 256, 0);
@@ -53,7 +54,7 @@ void RenderWidget::initializeGL() {
 	program->link();
 
 	// naloadamo podatke v teksturo
-	//char* h_volume = (char*) loadRawFile("data/skull256x256x256.raw", 256 * 256 * 256 * sizeof(char));
+	//char* h_volume = (char*) loadRawFile("data/foot256x256x256.raw", volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(char));
 	char* h_volume = makeCloud(96);
 
 	// pbo za volume
@@ -88,12 +89,29 @@ void RenderWidget::initializeGL() {
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 
-	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.3, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, };
+	float4 transferFunc[] = { 0.0, 0.0, 0.0, 0.0,
+			1.0, 1.0, 1.0, 1.3,
+			1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0,
+	};
 
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
 
 	float4* h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
+
+	float4 vel = {1.0, 1.0, 1.0, 1.0};
+
+	for (int x = 0; x < volumeSize.width; x++) {
+			for (int y = 0; y < volumeSize.height; y++) {
+				for (int z = 0; z < volumeSize.depth; z++) {
+
+
+
+					h_velocity[x * (volumeSize.width * volumeSize.height) + y * volumeSize.depth + z] = vel;
+				}
+			}
+		}
 
 	initCfd(h_volume, h_velocity, volumeSize);
 
@@ -126,7 +144,7 @@ void RenderWidget::paintGL() {
 	modelView.translate(viewTranslation.x, viewTranslation.y, viewTranslation.z);
 
 	if (doSim) {
-		fprintf(stderr, "Delam korak simulacije");
+		//fprintf(stderr, "Delam korak simulacije");
 		char* d_output;
 		cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
 		size_t num_bytes;
@@ -301,7 +319,7 @@ char* makeCloud( int size ) {
 
 	char* cloud = (char*) malloc(size * size * size * sizeof(char));
 
-	float frequency = 10.0f / size;
+	float frequency = 18.0f / size;
 	float center = size / 2.0f + 0.5f;
 
 	for (int x = 0; x < size; x++) {
@@ -315,7 +333,10 @@ char* makeCloud( int size ) {
 
 				float d = sqrtf(dx * dx + dy * dy + dz * dz) / size;
 
-				cloud[x * (size * size) + y * size + z] = ((d - off) < 0.125f) ? 255 : 0;
+				if(d < 0.5) {
+					cloud[x * (size * size) + y * size + z] = ((d - off) < 0.125f) ? 150 : 10;
+				}
+
 			}
 		}
 	}

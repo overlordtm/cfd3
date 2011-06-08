@@ -20,7 +20,7 @@ texture<VelocityType, 3, cudaReadModeElementType> velocityTex; // 3D texture
 cudaExtent volumeSize2;
 
 extern "C" void checkCudaErr( const char* msg );
-extern "C" void updateDensityTex();
+extern "C" void updateDensityTex(void* src);
 
 __global__
 void writeToPboKernel( char* pbo, DensityType* d_density, uint width, uint height, uint depth, int magic ) {
@@ -63,29 +63,15 @@ void advectDenistyKernel( DensityType* data, VelocityType* velocity, float dt, i
 	int k = blockIdx.x / magic * blockDim.z + threadIdx.z;
 
 	if (i < domX && j < domY && k < domZ) {
-/*
-		// remap to [0,1]
-		float x = (float) i / (float) domX - dt * velocity[k * (domY * domX) + j * domX + i].x;
-		float y = (float) j / (float) domY - dt * velocity[k * (domY * domX) + j * domX + i].y;
-		float z = (float) k / (float) domZ - dt * velocity[k * (domY * domX) + j * domX + i].z;
-/*
-		if (x < 0.0)
-			x = 0.0f;
-		if (x > 1.0)
-			x = 1.0f;
-		if (y < 0.0)
-			y = 0.0f;
-		if (y > 1.0)
-			x = 1.0f;
-		if (z < 0.0)
-			z = 0.0f;
-		if (z > 1.0)
-			x = 1.0f;
-*/
 
+/*
 		float x = i - dt * velocity[k * (domY * domX) + j * domX + i].x;
 		float y = j - dt * velocity[k * (domY * domX) + j * domX + i].y;
 		float z = k - dt * velocity[k * (domY * domX) + j * domX + i].z;
+		*/
+		float x = i - dt * 0;
+		float y = j - dt * 0;
+		float z = k - dt * 0;
 
 		float sample = tex3D(densityTex, x, y, z);
 		data[k * (domY * domX) + j * domX + i] = (DensityType)(sample * 255);
@@ -151,34 +137,37 @@ extern "C" void initCfd( char* h_volume, void* h_velocity, cudaExtent volumeSize
 extern "C" void simulate( dim3 gridSize, dim3 blockSize, char* pbo, cudaExtent volumeSize, int magic ) {
 
 
-	float dt = 0.005f;
+	float dt = 0.05f;
 
 	// delamo diffuse v pong rezultat
-	diffuseDensityKernel<<<gridSize, blockSize>>>( d_densityPing, d_densityPong, 0.01f, dt, volumeSize.width, volumeSize.height, volumeSize.depth, magic);
+	diffuseDensityKernel<<<gridSize, blockSize>>>( d_densityPing, d_densityPong, 0.10f, dt, volumeSize.width, volumeSize.height, volumeSize.depth, magic);
+	updateDensityTex(d_densityPing); // iz ping arraya v ping teksturo
+/*
+	// pingpong
+	DensityType* tmp = d_densityPing;
+	d_densityPing = d_densityPong;
+	d_densityPong = tmp;
+*/
+	advectDenistyKernel<<<gridSize, blockSize>>>(d_densityPing, d_velocityPing, dt, volumeSize.width, volumeSize.height, volumeSize.depth, magic );
+	//updateDensityTex(d_densityPing); // iz ping arraya v ping teksturo
+	writeToPboKernel<<<gridSize, blockSize>>>(pbo, d_densityPing, volumeSize.width, volumeSize.height, volumeSize.depth, magic);
+
 
 	// pingpong
 	DensityType* tmp = d_densityPing;
 	d_densityPing = d_densityPong;
 	d_densityPong = tmp;
 
-	updateDensityTex(); // iz ping arraya v ping teksturo
-	//advectDenistyKernel<<<gridSize, blockSize>>>(d_densityPing, d_velocityPing, dt, volumeSize.width, volumeSize.height, volumeSize.depth, magic );
-	//updateDensityTex(); // iz ping arraya v ping teksturo
-
-	writeToPboKernel<<<gridSize, blockSize>>>(pbo, d_densityPing, volumeSize.width, volumeSize.height, volumeSize.depth, magic);
-
-
-
 	cudaThreadSynchronize();
 	checkCudaErr("writeToPboKernel");
 }
 
-extern "C" void updateDensityTex() {
+extern "C" void updateDensityTex(void* src) {
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<DensityType> ();
 
 	// copy data to 3D array
 	cudaMemcpy3DParms copyParams = { 0 };
-	copyParams.srcPtr = make_cudaPitchedPtr(d_densityPing, volumeSize2.width * sizeof(DensityType), volumeSize2.width, volumeSize2.height);
+	copyParams.srcPtr = make_cudaPitchedPtr(src, volumeSize2.width * sizeof(DensityType), volumeSize2.width, volumeSize2.height);
 	copyParams.dstArray = d_densityPingArray;
 	copyParams.extent = volumeSize2;
 	copyParams.kind = cudaMemcpyDeviceToDevice;
