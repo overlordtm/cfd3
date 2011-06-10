@@ -16,6 +16,7 @@ cfd3::cfd3( QWidget *parent ) :
 	renderWidget = new RenderWidget();
 	setCentralWidget(renderWidget);
 
+	/*
 	QMenu *fileMenu;
 	QAction* openAction = new QAction(tr("&Open"), this);
 	openAction->setShortcut(tr("Ctrl+O"));
@@ -24,8 +25,9 @@ cfd3::cfd3( QWidget *parent ) :
 
 	fileMenu = menuBar()->addMenu("File");
 	fileMenu->addAction(openAction);
+	*/
 
-	QString message = *new QString("To start/stop simulation, press S. To reset, pres R");
+	QString message = *new QString("To start/stop simulation, press S.");
 	statusBar()->showMessage(message);
 
 	setMinimumSize(512, 512);

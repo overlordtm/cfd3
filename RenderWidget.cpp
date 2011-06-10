@@ -55,7 +55,7 @@ void RenderWidget::initializeGL() {
 
 	// naloadamo podatke v teksturo
 	//char* h_volume = (char*) loadRawFile("data/foot256x256x256.raw", volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(char));
-	char* h_volume = makeCloud(96);
+	h_volume = makeCloud(96);
 
 	// pbo za volume
 	glGenBuffers(1, &volumePbo);
@@ -98,7 +98,7 @@ void RenderWidget::initializeGL() {
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, sizeof(transferFunc) / sizeof(float4), 0, GL_RGBA, GL_FLOAT, transferFunc);
 	glBindTexture(GL_TEXTURE_1D, 0);
 
-	float4* h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
+	h_velocity = (float4*) malloc(volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(float4));
 
 	float4 vel = {1.0, 1.0, 1.0, 1.0};
 
@@ -288,7 +288,14 @@ void RenderWidget::keyPressEvent( QKeyEvent* event ) {
 }
 
 void RenderWidget::loadModel( QString filename ) {
-	qDebug() << "Loading model! " << filename;
+	qDebug() << "Loading model! " << filename.toAscii();
+
+	doSim = false;
+
+	//h_volume = loadRawFile(filename.toAscii(), volumeSize.width * volumeSize.height * volumeSize.depth * sizeof(char));
+
+	initCfd(h_volume, h_velocity, volumeSize);
+
 }
 
 RenderWidget::~RenderWidget() {

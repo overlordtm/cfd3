@@ -50,6 +50,9 @@ private:
 	cudaExtent volumeSize;
 	cudaExtent renderSize;
 
+	char* h_volume;
+	float4* h_velocity;
+
 	QMatrix4x4 projection;
 	QMatrix4x4 modelView;
 
