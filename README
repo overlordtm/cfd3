@@ -16,7 +16,7 @@ Uporabljam QT-ov sistem, torej najprej se iz datoteke cfd3.pro (ki jo je treba p
 4) make
 5) ./cfd3
 
-To je to, ce se kaj zalomi, andraz@vrhovec.si
+To je to, ce se kaj zalomi, andraz (pri) vrhovec.si
 
 Tocen seznam odvisnosti (ldd cfd3):
 
